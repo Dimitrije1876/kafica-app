@@ -26,10 +26,10 @@ function BarView() {
     })
     return () => unsub()
   }, [])
+  
 
   const narudzbineZaSto = (broj) =>
-    narudzbine.filter(n => n.stolBroj === broj && n.status !== "placeno")
-
+  narudzbine.filter(n => n.stolBroj === broj && n.status !== "placeno" && n.tip !== "takeaway")
   const statusSto = (broj) => {
     const nz = narudzbineZaSto(broj)
     if (nz.length === 0) return "slobodan"
@@ -48,6 +48,9 @@ function BarView() {
       .flatMap(n => n.stavke || [])
       .reduce((acc, s) => acc + s.cena * s.kolicina, 0)
   }
+  const promeniStatus = async (id, noviStatus) => {
+  await updateDoc(doc(db, "narudzbine", id), { status: noviStatus })
+}
 
   const dodajStavkuKonobar = async (stavka) => {
     await addDoc(collection(db, "narudzbine"), {
@@ -201,38 +204,87 @@ function BarView() {
 
   // Prikaz stolova
   return (
-    <div className="min-h-screen bg-gray-100">
-      <div className="bg-white p-4 shadow text-center">
-        <h1 className="text-2xl font-bold">Šank — Pregled stolova</h1>
-      </div>
-
-      <div className="p-4 grid grid-cols-2 gap-4 sm:grid-cols-3">
-        {STOLOVI.map(broj => {
-          const status = statusSto(broj)
-          return (
-            <button
-              key={broj}
-              onClick={() => setAktivniSto(broj)}
-              className={`border-2 rounded-xl p-6 text-center shadow ${bojaSto(status)}`}
-            >
-              <div className="text-3xl mb-2">🪑</div>
-              <div className="font-bold text-lg">Sto {broj}</div>
-              <div className="text-sm text-gray-600 mt-1">{status}</div>
-              {status !== "slobodan" && (
-                <div className="text-sm font-semibold mt-1">{ukupnoZaSto(broj)} RSD</div>
-              )}
-            </button>
-          )
-        })}
-      </div>
-
-      <div className="p-4 flex gap-3 text-sm">
-        <span className="bg-green-100 px-3 py-1 rounded-full">🟢 Slobodan</span>
-        <span className="bg-yellow-100 px-3 py-1 rounded-full">🟡 Aktivan</span>
-        <span className="bg-red-100 px-3 py-1 rounded-full">🔴 Račun</span>
-      </div>
+  <div className="min-h-screen bg-gray-100">
+    <div className="bg-white p-4 shadow text-center">
+      <h1 className="text-2xl font-bold">Šank — Pregled stolova</h1>
     </div>
-  )
+
+    {/* Za poneti narudžbine */}
+    {narudzbine.filter(n => n.tip === "takeaway" && n.status !== "placeno").length > 0 && (
+      <div className="p-4">
+        <h2 className="text-lg font-bold mb-3 text-amber-600">🥡 Za poneti</h2>
+        {narudzbine
+          .filter(n => n.tip === "takeaway" && n.status !== "placeno")
+          .map(n => (
+            <div key={n.id} className="bg-white rounded-xl shadow p-4 mb-3 border-l-4 border-amber-400">
+              <div className="flex justify-between items-center mb-2">
+                <span className="font-bold">{n.ime || "Nepoznato"}</span>
+                <span className={`text-sm px-2 py-1 rounded-full ${
+                  n.status === "nova" ? "bg-red-100 text-red-600" :
+                  n.status === "u pripremi" ? "bg-yellow-100 text-yellow-600" :
+                  "bg-green-100 text-green-600"
+                }`}>{n.status}</span>
+              </div>
+              {n.stavke?.map((s, i) => (
+                <div key={i} className="text-sm text-gray-700 mb-1">
+                  {s.kolicina}x {s.naziv} — {s.cena * s.kolicina} RSD
+                </div>
+              ))}
+              <div className="flex justify-between items-center mt-2">
+                <span className="font-bold">{n.ukupno} RSD</span>
+                <div className="flex gap-2">
+                  {n.status === "nova" && (
+                    <button
+                      onClick={() => promeniStatus(n.id, "u pripremi")}
+                      className="bg-yellow-400 text-white px-3 py-1 rounded-lg text-sm"
+                    >
+                      U pripremi
+                    </button>
+                  )}
+                  {n.status === "u pripremi" && (
+                    <button
+                      onClick={() => promeniStatus(n.id, "placeno")}
+                      className="bg-green-500 text-white px-3 py-1 rounded-lg text-sm"
+                    >
+                      Preuzeto ✓
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+      </div>
+    )}
+
+    {/* Stolovi */}
+    <div className="p-4 grid grid-cols-2 gap-4 sm:grid-cols-3">
+      {STOLOVI.map(broj => {
+        const status = statusSto(broj)
+        return (
+          <button
+            key={broj}
+            onClick={() => setAktivniSto(broj)}
+            className={`border-2 rounded-xl p-6 text-center shadow ${bojaSto(status)}`}
+          >
+            <div className="text-3xl mb-2">🪑</div>
+            <div className="font-bold text-lg">Sto {broj}</div>
+            <div className="text-sm text-gray-600 mt-1">{status}</div>
+            {status !== "slobodan" && (
+              <div className="text-sm font-semibold mt-1">{ukupnoZaSto(broj)} RSD</div>
+            )}
+          </button>
+        )
+      })}
+    </div>
+
+    <div className="p-4 flex gap-3 text-sm">
+      <span className="bg-green-100 px-3 py-1 rounded-full">🟢 Slobodan</span>
+      <span className="bg-yellow-100 px-3 py-1 rounded-full">🟡 Aktivan</span>
+      <span className="bg-red-100 px-3 py-1 rounded-full">🔴 Račun</span>
+    </div>
+  </div>
+)
 }
+  
 
 export default BarView
